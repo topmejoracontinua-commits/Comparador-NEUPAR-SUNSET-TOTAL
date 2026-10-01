@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualizar Precios Competencia</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 0;
+    background: #f4f5f7;
+    color: #1a1a1a;
+    padding: 20px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  header {
+    background: #14213d;
+    color: #fff;
+    padding: 20px 24px;
+    border-radius: 10px 10px 0 0;
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header .sub { font-size: 13px; opacity: .8; }
+
+  .card {
+    background: #fff;
+    padding: 24px;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+
+  .campo { margin-bottom: 20px; }
+  .campo label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .campo label .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .dot.sunset { background: #f5a623; }
+  .dot.neupar { background: #2e86de; }
+
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+    line-height: 1.4;
+  }
+  textarea:focus { outline: none; border-color: #14213d; }
+
+  .contador {
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .acciones {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  button#enviar { background: #14213d; color: #fff; }
+  button#enviar:hover { opacity: .9; }
+  button#enviar:disabled { background: #999; cursor: not-allowed; }
+  button#limpiar { background: #eee; color: #333; }
+  button#limpiar:hover { background: #ddd; }
+
+  .estado {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+  }
+  .estado.ok { display: block; background: #e6f7ea; color: #1a7a3c; border: 1px solid #b8e6c4; }
+  .estado.error { display: block; background: #fdecea; color: #b3261e; border: 1px solid #f5c2bd; }
+  .estado.cargando { display: block; background: #fff8e1; color: #8a6d00; border: 1px solid #ffe8a3; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #8a6d00;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: girar .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  footer { text-align: center; font-size: 12px; color: #999; padding: 16px 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Actualizar Precios Competencia</h1>
+    <div class="sub">Pegá el mensaje de cada proveedor y enviá para regenerar la comparativa</div>
+  </header>
+
+  <div class="card">
+    <div class="campo">
+      <label><span class="dot sunset"></span> Mensaje de Sunset</label>
+      <textarea id="sunset" placeholder="Pegá aquí el mensaje completo de Sunset (ej: PROMOCION IMPERDIBLE... 165/70R13 XBRI: 22$ 18.50$ ...)"></textarea>
+      <div class="contador"><span id="contadorSunset">0</span> caracteres</div>
+    </div>
+
+    <div class="campo">
+      <label><span class="dot neupar"></span> Mensaje de Neupar</label>
+      <textarea id="neupar" placeholder="Pegá aquí el mensaje completo de Neupar (ej: ACTUALIZACION DE PRECIOS... 165/70R13 = 20$ ...)"></textarea>
+      <div class="contador"><span id="contadorNeupar">0</span> caracteres</div>
+    </div>
+
+    <div class="acciones">
+      <button id="enviar">Enviar y generar comparativa</button>
+      <button id="limpiar" type="button">Limpiar</button>
+    </div>
+
+    <div class="estado" id="estado"></div>
+  </div>
+
+  <footer>Top Neumaticos S.R.L. — Comparativa de Precios</footer>
+</div>
+
+<script>
+  // URL del webhook de n8n — reemplazar por la URL real de producción
+  const WEBHOOK_URL = 'https://envy-recollect-last.ngrok-free.dev/webhook/comparativa';
+
+  const sunsetEl = document.getElementById('sunset');
+  const neuparEl = document.getElementById('neupar');
+  const contadorSunset = document.getElementById('contadorSunset');
+  const contadorNeupar = document.getElementById('contadorNeupar');
+  const btnEnviar = document.getElementById('enviar');
+  const btnLimpiar = document.getElementById('limpiar');
+  const estado = document.getElementById('estado');
+
+  function actualizarContador(el, contadorEl) {
+    contadorEl.textContent = el.value.length;
+  }
+  sunsetEl.addEventListener('input', () => actualizarContador(sunsetEl, contadorSunset));
+  neuparEl.addEventListener('input', () => actualizarContador(neuparEl, contadorNeupar));
+
+  function mostrarEstado(tipo, mensaje) {
+    estado.className = 'estado ' + tipo;
+    estado.innerHTML = tipo === 'cargando' ? '<span class="spinner"></span>' + mensaje : mensaje;
+  }
+
+  btnLimpiar.addEventListener('click', () => {
+    sunsetEl.value = '';
+    neuparEl.value = '';
+    actualizarContador(sunsetEl, contadorSunset);
+    actualizarContador(neuparEl, contadorNeupar);
+    estado.className = 'estado';
+  });
+
+  btnEnviar.addEventListener('click', async () => {
+    const sunset = sunsetEl.value.trim();
+    const neupar = neuparEl.value.trim();
+
+    if (!sunset || !neupar) {
+      mostrarEstado('error', 'Pegá el mensaje de ambos proveedores antes de enviar.');
+      return;
+    }
+
+    btnEnviar.disabled = true;
+    mostrarEstado('cargando', 'Procesando y generando comparativa...');
+
+    try {
+      const resp = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sunset, neupar }),
+      });
+
+      if (!resp.ok) throw new Error('El servidor respondió con error (' + resp.status + ')');
+
+      mostrarEstado('ok', '✓ Comparativa generada y enviada por correo correctamente.');
+    } catch (err) {
+      mostrarEstado('error', '✗ Error al enviar: ' + err.message + '. Verificá que el workflow esté activo.');
+    } finally {
+      btnEnviar.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>
