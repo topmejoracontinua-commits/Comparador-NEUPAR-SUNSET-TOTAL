@@ -145,7 +145,7 @@
 </div>
 
 <script>
-  // URL del webhook de n8n — reemplazar por la URL real de producción
+  // URL del webhook de n8n
   const WEBHOOK_URL = 'https://envy-recollect-last.ngrok-free.dev/webhook/comparativa';
 
   const sunsetEl = document.getElementById('sunset');
@@ -187,6 +187,9 @@
     btnEnviar.disabled = true;
     mostrarEstado('cargando', 'Procesando y generando comparativa...');
 
+    // Abrimos la pestaña ANTES del fetch (sincrónico con el click) para que el navegador no bloquee el popup
+    const ventana = window.open('', '_blank');
+
     try {
       const resp = await fetch(WEBHOOK_URL, {
         method: 'POST',
@@ -196,8 +199,18 @@
 
       if (!resp.ok) throw new Error('El servidor respondió con error (' + resp.status + ')');
 
-      mostrarEstado('ok', '✓ Comparativa generada y enviada por correo correctamente.');
+      const html = await resp.text();
+
+      if (ventana) {
+        ventana.document.open();
+        ventana.document.write(html);
+        ventana.document.close();
+        mostrarEstado('ok', '✓ Comparativa generada — se abrió en una pestaña nueva.');
+      } else {
+        mostrarEstado('error', 'El navegador bloqueó la ventana emergente. Habilitá popups para este sitio e intentá de nuevo.');
+      }
     } catch (err) {
+      if (ventana) ventana.close();
       mostrarEstado('error', '✗ Error al enviar: ' + err.message + '. Verificá que el workflow esté activo.');
     } finally {
       btnEnviar.disabled = false;
